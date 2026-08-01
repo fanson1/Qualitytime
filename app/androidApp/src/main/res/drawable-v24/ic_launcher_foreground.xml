@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="14"
+        android:translateY="14"
+        android:scaleX="0.4"
+        android:scaleY="0.4">
+        <!-- Scroll Paper Body -->
+        <path
+            android:fillColor="#FCFBF4"
+            android:pathData="M60,60 h80 v80 h-80 z"/>
+        <!-- Scroll Edges (Left) -->
+        <path
+            android:fillColor="#8B0000"
+            android:pathData="M55,55 h10 v90 h-10 c-5,0-5,-90,0,-90 z"/>
+        <!-- Scroll Edges (Right) -->
+        <path
+            android:fillColor="#8B0000"
+            android:pathData="M135,55 h10 v90 h-10 c5,0,5,-90,0,-90 z"/>
+        <!-- Center AI/Baby Symbol -->
+        <path
+            android:fillColor="#2C2C2C"
+            android:pathData="M100,85 l-15,15 h30 l-15,-15 M90,100 h20 M100,100 v25 M85,130 q15,-5 30,0"/>
+    </group>
+</vector>
