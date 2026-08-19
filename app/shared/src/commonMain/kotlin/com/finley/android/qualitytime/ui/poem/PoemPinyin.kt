@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.finley.android.qualitytime.ui.theme.PoemFont
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -84,6 +85,10 @@ fun RubyText(
     charFontSize: TextUnit = 26.sp,
     pinyinFontSize: TextUnit = 13.sp
 ) {
+    val highlightColor = MaterialTheme.colorScheme.primary
+    val normalColor = MaterialTheme.colorScheme.onSurface
+    val pinyinNormalColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -92,14 +97,15 @@ fun RubyText(
             text = pinyin,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = pinyinFontSize,
-                color = if (isHighlighted) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.6f),
+                color = if (isHighlighted) highlightColor else pinyinNormalColor,
                 fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal
             )
         )
         Text(
             text = char,
+            fontFamily = PoemFont,
             style = MaterialTheme.typography.headlineSmall.copy(fontSize = charFontSize),
-            color = if (isHighlighted) MaterialTheme.colorScheme.primary else Color.Black,
+            color = if (isHighlighted) highlightColor else normalColor,
             fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Medium
         )
     }

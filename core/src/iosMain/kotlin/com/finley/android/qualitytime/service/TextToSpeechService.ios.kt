@@ -1,12 +1,19 @@
 package com.finley.android.qualitytime.service
 
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.ObjCSignatureOverride
 import platform.AVFAudio.AVAudioSession
+import platform.AVFAudio.AVAudioSessionCategoryOptionDefaultToSpeaker
+import platform.AVFAudio.AVAudioSessionCategoryPlayback
+import platform.AVFAudio.AVSpeechBoundary
 import platform.AVFAudio.AVSpeechSynthesizer
 import platform.AVFAudio.AVSpeechUtterance
 import platform.AVFAudio.AVSpeechSynthesisVoice
 import platform.AVFAudio.AVSpeechSynthesizerDelegateProtocol
+import platform.AVFAudio.setActive
 import platform.darwin.NSObject
 
+@OptIn(ExperimentalForeignApi::class)
 class IosTextToSpeechService : TextToSpeechService {
     private val synthesizer = AVSpeechSynthesizer()
     private var onStartListener: ((String) -> Unit)? = null
@@ -17,12 +24,14 @@ class IosTextToSpeechService : TextToSpeechService {
     private val utteranceIdMap = mutableMapOf<String, String>()
 
     private val delegate = object : NSObject(), AVSpeechSynthesizerDelegateProtocol {
+        @ObjCSignatureOverride
         override fun speechSynthesizer(synthesizer: AVSpeechSynthesizer, didStartSpeechUtterance: AVSpeechUtterance) {
             val speechString = didStartSpeechUtterance.speechString ?: return
             val id = utteranceIdMap[speechString] ?: return
             onStartListener?.invoke(id)
         }
 
+        @ObjCSignatureOverride
         override fun speechSynthesizer(synthesizer: AVSpeechSynthesizer, didFinishSpeechUtterance: AVSpeechUtterance) {
             val speechString = didFinishSpeechUtterance.speechString ?: return
             val id = utteranceIdMap[speechString] ?: return
@@ -34,19 +43,20 @@ class IosTextToSpeechService : TextToSpeechService {
         synthesizer.delegate = delegate
         // Route audio through loudspeaker for louder playback
         val session = AVAudioSession.sharedInstance()
-        session.setCategoryWithOptionsError(
+        session.setCategory(
             AVAudioSessionCategoryPlayback,
-            AVAudioSessionCategoryOptionDefaultToSpeaker
+            withOptions = AVAudioSessionCategoryOptionDefaultToSpeaker,
+            error = null
         )
-        session.setActiveError(true)
+        session.setActive(true, error = null)
     }
 
     override fun speak(text: String, utteranceId: String, enqueue: Boolean) {
         if (!enqueue) {
-            synthesizer.stopSpeakingAtBoundary(0)
+            synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
         }
         val utterance = AVSpeechUtterance.speechUtteranceWithString(text)
-        
+
         val voice = if (selectedVoiceId != null) {
             AVSpeechSynthesisVoice.voiceWithIdentifier(selectedVoiceId!!)
         } else {
@@ -60,7 +70,7 @@ class IosTextToSpeechService : TextToSpeechService {
     }
 
     override fun stop() {
-        synthesizer.stopSpeakingAtBoundary(0)
+        synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
     }
 
     override fun dispose() {}

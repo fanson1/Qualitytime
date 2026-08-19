@@ -3,16 +3,7 @@ package com.finley.android.qualitytime.ui.poem
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -23,22 +14,10 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,21 +38,28 @@ fun FilterSection(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+    Column(modifier = Modifier.padding(bottom = 10.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
                 value = state.searchQuery,
                 onValueChange = { onIntent(PoemIntent.SearchPoems(it)) },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("搜索诗名、作者...", fontSize = 14.sp) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 trailingIcon = {
                     if (state.searchQuery.isNotEmpty()) {
                         IconButton(onClick = { onIntent(PoemIntent.SearchPoems("")) }) {
@@ -86,9 +72,9 @@ fun FilterSection(
                     }
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = Color.White,
-                    focusedContainerColor = Color.White,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                 )
             )
 
@@ -96,102 +82,91 @@ fun FilterSection(
                 badge = {
                     if (state.activeFilterCount > 0) {
                         Badge(containerColor = MaterialTheme.colorScheme.secondary) {
-                            Text(state.activeFilterCount.toString())
+                            Text(state.activeFilterCount.toString(), fontSize = 9.sp)
                         }
                     }
                 }
             ) {
-                Surface(
-                    onClick = { onIntent(PoemIntent.ResetFilters) },
-                    modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            "重置",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                FilterButton(
+                    icon = {
+                        Icon(
+                            Icons.Filled.Tune,
+                            contentDescription = "重置筛选",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
                         )
-                    }
-                }
+                    },
+                    onClick = { onIntent(PoemIntent.ResetFilters) },
+                    modifier = Modifier.size(48.dp)
+                )
             }
         }
 
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val allGrade = state.grades.firstOrNull { it.name == "全部" }
-                if (allGrade != null) {
-                    Spacer(modifier = Modifier.width(12.dp))
-                    FilterChip(
-                        selected = state.selectedGrade == "全部",
-                        onClick = { onIntent(PoemIntent.FilterByGrade("全部")) },
-                        label = { Text("全部 (${allGrade.count})", fontSize = 11.sp) },
-                        shape = CircleShape,
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = Color.White
-                        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val allGrade = state.grades.firstOrNull { it.name == "全部" }
+            if (allGrade != null) {
+                Spacer(modifier = Modifier.width(16.dp))
+                FilterChip(
+                    selected = state.selectedGrade == "全部",
+                    onClick = { onIntent(PoemIntent.FilterByGrade("全部")) },
+                    label = { Text("全部 (${allGrade.count})", fontSize = 11.sp) },
+                    shape = CircleShape,
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                     )
-                }
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
 
-                ScrollableTabRow(
-                    modifier = Modifier.weight(1f),
-                    selectedTabIndex = (state.grades.drop(1).indexOfFirst { it.name == state.selectedGrade })
-                        .coerceAtLeast(0),
-                    edgePadding = 0.dp,
-                    containerColor = Color.Transparent,
-                    divider = {},
-                    indicator = { tabPositions ->
-                        val index = state.grades.drop(1).indexOfFirst { it.name == state.selectedGrade }
-                        if (index != -1 && index < tabPositions.size) {
-                            TabRowDefaults.SecondaryIndicator(
-                                Modifier.tabIndicatorOffset(tabPositions[index]),
-                                color = MaterialTheme.colorScheme.primary,
-                                height = 3.dp
+            ScrollableTabRow(
+                modifier = Modifier.weight(1f),
+                selectedTabIndex = (state.grades.drop(1).indexOfFirst { it.name == state.selectedGrade })
+                    .coerceAtLeast(0),
+                edgePadding = 0.dp,
+                containerColor = Color.Transparent,
+                divider = {},
+                indicator = { tabPositions ->
+                    val index = state.grades.drop(1).indexOfFirst { it.name == state.selectedGrade }
+                    if (index != -1 && index < tabPositions.size) {
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[index]),
+                            color = MaterialTheme.colorScheme.primary,
+                            height = 3.dp
+                        )
+                    }
+                }
+            ) {
+                state.grades.drop(1).forEach { gradeOption ->
+                    Tab(
+                        selected = state.selectedGrade == gradeOption.name,
+                        onClick = { onIntent(PoemIntent.FilterByGrade(gradeOption.name)) },
+                        text = {
+                            Text(
+                                "${gradeOption.name} (${gradeOption.count})",
+                                fontSize = 13.sp,
+                                fontWeight = if (state.selectedGrade == gradeOption.name) FontWeight.Bold else FontWeight.Normal
                             )
                         }
-                    }
-                ) {
-                    state.grades.drop(1).forEach { gradeOption ->
-                        Tab(
-                            selected = state.selectedGrade == gradeOption.name,
-                            onClick = { onIntent(PoemIntent.FilterByGrade(gradeOption.name)) },
-                            text = {
-                                Text(
-                                    "${gradeOption.name} (${gradeOption.count})",
-                                    fontSize = 14.sp,
-                                    fontWeight = if (state.selectedGrade == gradeOption.name) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        )
-                    }
-                }
-
-                BadgedBox(
-                    badge = {
-                        if (state.activeFilterCount > 0) {
-                            Badge(containerColor = MaterialTheme.colorScheme.secondary) {
-                                Text(state.activeFilterCount.toString())
-                            }
-                        }
-                    }
-                ) {
-                    IconButton(
-                        onClick = { expanded = !expanded }
-                    ) {
-                        Icon(
-                            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                            contentDescription = if (expanded) "收起筛选" else "展开筛选",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    )
                 }
             }
+
+            FilterButton(
+                icon = {
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = if (expanded) "收起筛选" else "展开筛选",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = { expanded = !expanded },
+                modifier = Modifier.size(40.dp)
+            )
         }
 
         AnimatedVisibility(
@@ -199,7 +174,7 @@ fun FilterSection(
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {
-            Column {
+            Column(modifier = Modifier.padding(top = 4.dp)) {
                 HorizontalFilterRow("朝代", state.dynasties, state.selectedDynasty) {
                     onIntent(PoemIntent.FilterByDynasty(it))
                 }
@@ -210,6 +185,27 @@ fun FilterSection(
 
                 SortSection(state, onIntent)
             }
+        }
+    }
+}
+
+@Composable
+private fun FilterButton(
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+        )
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            icon()
         }
     }
 }
@@ -232,7 +228,7 @@ fun HorizontalFilterRow(
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(32.dp)
         )
         if (options.isNotEmpty()) {
@@ -244,7 +240,7 @@ fun HorizontalFilterRow(
                 shape = CircleShape,
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = Color.White
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }
@@ -257,7 +253,7 @@ fun HorizontalFilterRow(
                     shape = CircleShape,
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = Color.White
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                     )
                 )
             }
@@ -281,7 +277,7 @@ fun SortSection(
         Text(
             "排序",
             style = MaterialTheme.typography.labelSmall,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(32.dp)
         )
         if (sortOptions.isNotEmpty()) {
@@ -329,30 +325,42 @@ fun SortSection(
 }
 
 @Composable
-fun EmptyState(modifier: Modifier = Modifier) {
+fun EmptyState(modifier: Modifier = Modifier, onReset: () -> Unit = {}) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(
-            modifier = Modifier.size(120.dp),
+            modifier = Modifier.size(110.dp),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text("墨", fontSize = 48.sp, color = Color.LightGray, fontWeight = FontWeight.Bold)
+                Text(
+                    "诗",
+                    fontSize = 44.sp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(18.dp))
         Text(
             text = "未找到相关诗词",
             style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "换个关键词，或者重置筛选试试",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-            text = "换个词试试，或者重置筛选",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.Gray
-        )
+        Spacer(modifier = Modifier.height(20.dp))
+        OutlinedButton(onClick = onReset) {
+            Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("重置筛选")
+        }
     }
 }
