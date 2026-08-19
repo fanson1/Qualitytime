@@ -145,7 +145,7 @@ object PoemFilterEngine {
     private val GRADE_ORDER = listOf(
         "0年级", "一年级", "二年级", "三年级", "四年级",
         "五年级", "六年级", "七年级", "八年级", "九年级",
-        "10年级", "11年级", "12年级", "13年级"
+        "10年级", "11年级", "12年级", "十三年级"
     )
 
     private val DYNASTY_ORDER = listOf(
