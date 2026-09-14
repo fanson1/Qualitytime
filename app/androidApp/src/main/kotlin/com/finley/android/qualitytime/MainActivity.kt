@@ -15,7 +15,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        
+        // Prevent the system from adding a translucent scrim to the navigation
+        // bar so the app's edge-to-edge background shows through it.
+        window.isNavigationBarContrastEnforced = false
+
         val ttsService = createTextToSpeechService(applicationContext)
         val settingsService = DataStoreSettingsService(createDataStore(applicationContext))
 
