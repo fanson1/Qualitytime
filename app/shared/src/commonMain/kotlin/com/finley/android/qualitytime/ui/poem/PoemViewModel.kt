@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.finley.android.qualitytime.model.Poem
 import com.finley.android.qualitytime.service.SettingsService
 import com.finley.android.qualitytime.service.TextToSpeechService
+import com.finley.android.qualitytime.util.AppLog
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -17,6 +19,14 @@ class PoemViewModel(
     private val settingsService: SettingsService? = null
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "PoemViewModel"
+        private const val SPLASH_DURATION_MS = 2000L
+        private const val SEARCH_DEBOUNCE_MS = 250L
+        private const val VOICE_REFRESH_RETRIES = 3
+        private const val VOICE_REFRESH_DELAY_MS = 800L
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _viewState = MutableStateFlow(PoemState())
@@ -25,13 +35,16 @@ class PoemViewModel(
     private val _effect = MutableSharedFlow<PoemEffect>()
     val effect: SharedFlow<PoemEffect> = _effect.asSharedFlow()
 
+    /** id of the last utterance of the currently-read poem; used to auto-advance. */
     private var lastUtteranceId: String = ""
+
+    /** Cancel and replace on each keystroke to debounce filtering. */
+    private var searchJob: Job? = null
 
     init {
         ttsService?.setProgressListener(
             onStart = { utteranceId ->
-                val index = utteranceId.toIntOrNull() ?: -1
-                handleIntent(PoemIntent.UpdateHighlight(index))
+                utteranceId.toIntOrNull()?.let { handleIntent(PoemIntent.UpdateHighlight(it)) }
             },
             onDone = { utteranceId ->
                 handleIntent(PoemIntent.OnPlaybackDone(utteranceId))
@@ -44,15 +57,15 @@ class PoemViewModel(
 
     private fun startSplashTimer() {
         viewModelScope.launch {
-            delay(2000)
+            delay(SPLASH_DURATION_MS)
             handleIntent(PoemIntent.SplashComplete)
         }
     }
 
     fun handleIntent(intent: PoemIntent) {
-        println("PoemViewModel handleIntent: $intent")
         when (intent) {
             is PoemIntent.LoadPoems -> loadPoems()
+            is PoemIntent.RetryLoad -> loadPoems()
             is PoemIntent.SelectPoem -> selectPoem(intent.poem)
             is PoemIntent.Speak -> speak(intent.poem)
             is PoemIntent.StopSpeaking -> stopSpeaking()
@@ -68,11 +81,8 @@ class PoemViewModel(
             is PoemIntent.ResetFilters -> resetFilters()
             is PoemIntent.ChangeVoice -> changeVoice(intent.id)
             is PoemIntent.NavigateToSettings -> navigateToSettings(intent.show)
+            is PoemIntent.SplashComplete -> completeSplash()
             is PoemIntent.RefreshVoices -> refreshVoices()
-            is PoemIntent.SplashComplete -> {
-                refreshVoices()
-                _viewState.update { it.copy(isSplashComplete = true) }
-            }
             is PoemIntent.SortPoems -> sortPoemsBy(intent.sortKey)
             is PoemIntent.ToggleSortOrder -> toggleSortOrder()
         }
@@ -82,34 +92,36 @@ class PoemViewModel(
 
     private fun refreshVoices() {
         viewModelScope.launch {
-            var retries = 5
+            var retries = VOICE_REFRESH_RETRIES
             while (retries > 0) {
-                val voices = ttsService?.getVoices() ?: emptyList()
+                val voices = ttsService?.getVoices().orEmpty()
                 if (voices.isNotEmpty()) {
                     _viewState.update { it.copy(availableVoices = voices) }
                     return@launch
                 }
-                println("TTS voices empty, retrying... ($retries left)")
-                delay(1000)
+                AppLog.d(TAG) { "No voices available, retrying ($retries left)" }
+                delay(VOICE_REFRESH_DELAY_MS)
                 retries--
             }
         }
     }
 
+    private fun completeSplash() {
+        refreshVoices()
+        _viewState.update { it.copy(isSplashComplete = true) }
+    }
+
     private fun navigateToSettings(show: Boolean) {
-        if (show) {
-            refreshVoices()
-            _viewState.update { it.copy(isShowingSettings = true) }
-        } else {
-            _viewState.update { it.copy(isShowingSettings = false) }
-        }
+        if (show) refreshVoices()
+        _viewState.update { it.copy(isShowingSettings = show) }
     }
 
     private fun changeVoice(id: String) {
         _viewState.update { it.copy(selectedVoiceId = id) }
         ttsService?.setVoice(id)
-        ttsService?.speak("你好，这是新的朗读声音", "voice_preview", false)
         viewModelScope.launch { settingsService?.setSelectedVoiceId(id) }
+        // Short preview so the user hears the newly selected voice.
+        ttsService?.speak("你好，这是新的朗读声音", "voice_preview", false)
     }
 
     private fun toggleAutoPlay(enabled: Boolean) {
@@ -147,8 +159,14 @@ class PoemViewModel(
     }
 
     private fun searchPoems(query: String) {
+        // Update the field immediately so typing stays responsive, then filter
+        // after a short debounce so rapid keystrokes don't recompute the list.
         _viewState.update { it.copy(searchQuery = query) }
-        reapplyFilters()
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            reapplyFilters()
+        }
     }
 
     private fun filterByAuthor(author: String) {
@@ -162,11 +180,12 @@ class PoemViewModel(
     }
 
     private fun resetFilters() {
+        searchJob?.cancel()
         _viewState.update {
             it.copy(
-                selectedGrade = "全部",
-                selectedAuthor = "全部",
-                selectedDynasty = "全部",
+                selectedGrade = FILTER_ALL,
+                selectedAuthor = FILTER_ALL,
+                selectedDynasty = FILTER_ALL,
                 searchQuery = ""
             )
         }
@@ -174,27 +193,31 @@ class PoemViewModel(
     }
 
     private fun reapplyFilters() {
-        _viewState.update { state ->
-            val filtered = PoemFilterEngine.applyFilters(
-                poems = state.poems,
-                selectedGrade = state.selectedGrade,
-                selectedDynasty = state.selectedDynasty,
-                selectedAuthor = state.selectedAuthor,
-                searchQuery = state.searchQuery
+        val state = _viewState.value
+        val filtered = PoemFilterEngine.applyFilters(
+            poems = state.poems,
+            selectedGrade = state.selectedGrade,
+            selectedDynasty = state.selectedDynasty,
+            selectedAuthor = state.selectedAuthor,
+            searchQuery = state.searchQuery
+        )
+        val sorted = PoemFilterEngine.sortPoems(
+            poems = filtered,
+            sortKey = state.selectedSort,
+            ascending = state.sortAscending
+        )
+        val filterCount = PoemFilterEngine.countActiveFilters(
+            selectedGrade = state.selectedGrade,
+            selectedDynasty = state.selectedDynasty,
+            selectedAuthor = state.selectedAuthor,
+            searchQuery = state.searchQuery
+        )
+        _viewState.update {
+            it.copy(
+                filteredPoems = sorted,
+                activeFilterCount = filterCount,
+                letterIndexMap = PoemFilterEngine.computeLetterIndexMap(sorted)
             )
-            val sorted = PoemFilterEngine.sortPoems(
-                poems = filtered,
-                sortKey = state.selectedSort,
-                ascending = state.sortAscending
-            )
-            val filterCount = PoemFilterEngine.countActiveFilters(
-                selectedGrade = state.selectedGrade,
-                selectedDynasty = state.selectedDynasty,
-                selectedAuthor = state.selectedAuthor,
-                searchQuery = state.searchQuery
-            )
-            val letterMap = PoemFilterEngine.computeLetterIndexMap(sorted)
-            state.copy(filteredPoems = sorted, activeFilterCount = filterCount, letterIndexMap = letterMap)
         }
     }
 
@@ -203,61 +226,60 @@ class PoemViewModel(
     @OptIn(ExperimentalResourceApi::class)
     private fun loadPoems() {
         viewModelScope.launch {
-            println("PoemViewModel loading poems from JSON...")
-            _viewState.update { it.copy(isLoading = true) }
+            _viewState.update { it.copy(isLoading = true, loadError = null) }
             try {
                 val bytes = Res.readBytes("files/poems.json")
-                val poemsJson = bytes.decodeToString()
-                val poems = json.decodeFromString<List<Poem>>(poemsJson)
+                val poems = json.decodeFromString<List<Poem>>(bytes.decodeToString())
 
                 val categories = PoemFilterEngine.extractCategories(poems)
-                val voices = ttsService?.getVoices() ?: emptyList()
-                val letterMap = PoemFilterEngine.computeLetterIndexMap(poems)
+                val voices = ttsService?.getVoices().orEmpty()
 
                 _viewState.update {
                     it.copy(
                         poems = poems,
                         filteredPoems = poems,
                         isLoading = false,
-                        selectedGrade = "全部",
+                        loadError = null,
+                        selectedGrade = FILTER_ALL,
                         grades = categories.grades,
                         dynasties = categories.dynasties,
                         authors = categories.authors,
                         availableVoices = voices,
-                        letterIndexMap = letterMap
+                        letterIndexMap = PoemFilterEngine.computeLetterIndexMap(poems)
                     )
                 }
+                AppLog.i(TAG) { "Loaded ${poems.size} poems" }
             } catch (e: Exception) {
-                println("Error loading poems: ${e.message}")
-                _effect.emit(PoemEffect.ShowError("加载古诗库失败: ${e.message}"))
-                _viewState.update { it.copy(isLoading = false) }
+                AppLog.e(TAG, "Failed to load poems", e)
+                val message = "古诗库加载失败，请检查应用数据后重试"
+                _viewState.update { it.copy(isLoading = false, loadError = message) }
+                _effect.emit(PoemEffect.ShowError("$message: ${e.message}"))
             }
         }
     }
 
     private fun loadSettings() {
-        settingsService?.let { service ->
-            viewModelScope.launch {
-                service.getSpeechRate().collect { rate ->
-                    _viewState.update { it.copy(speechRate = rate) }
-                    ttsService?.setSpeechRate(rate)
-                }
+        settingsService ?: return
+        viewModelScope.launch {
+            settingsService.getSpeechRate().collect { rate ->
+                _viewState.update { it.copy(speechRate = rate) }
+                ttsService?.setSpeechRate(rate)
             }
-            viewModelScope.launch {
-                service.isAutoPlayEnabled().collect { enabled ->
-                    _viewState.update { it.copy(isAutoPlay = enabled) }
-                }
+        }
+        viewModelScope.launch {
+            settingsService.isAutoPlayEnabled().collect { enabled ->
+                _viewState.update { it.copy(isAutoPlay = enabled) }
             }
-            viewModelScope.launch {
-                service.getSelectedVoiceId().collect { id ->
-                    _viewState.update { it.copy(selectedVoiceId = id) }
-                    id?.let { ttsService?.setVoice(it) }
-                }
+        }
+        viewModelScope.launch {
+            settingsService.getSelectedVoiceId().collect { id ->
+                _viewState.update { it.copy(selectedVoiceId = id) }
+                id?.let { ttsService?.setVoice(it) }
             }
-            viewModelScope.launch {
-                service.isShowPinyinEnabled().collect { enabled ->
-                    _viewState.update { it.copy(showPinyin = enabled) }
-                }
+        }
+        viewModelScope.launch {
+            settingsService.isShowPinyinEnabled().collect { enabled ->
+                _viewState.update { it.copy(showPinyin = enabled) }
             }
         }
     }
@@ -265,19 +287,19 @@ class PoemViewModel(
     // ── Poem Selection & TTS ─────────────────────────────────────────────
 
     private fun selectPoem(poem: Poem?) {
-        println("PoemViewModel selectPoem: ${poem?.title}")
+        AppLog.d(TAG) { "selectPoem: ${poem?.title}" }
         stopSpeaking()
         _viewState.update { it.copy(selectedPoem = poem, highlightIndex = -1) }
     }
 
     private fun speak(poem: Poem) {
-        println("PoemViewModel speak: ${poem.title}, ttsService: $ttsService")
-        if (ttsService == null) {
-            viewModelScope.launch { _effect.emit(PoemEffect.ShowError("TTS 服务不可用")) }
+        val service = ttsService
+        if (service == null) {
+            emitError("语音服务不可用")
             return
         }
-        if (!ttsService.isReady()) {
-            viewModelScope.launch { _effect.emit(PoemEffect.ShowError("TTS 引擎正在初始化，请稍候...")) }
+        if (!service.isReady()) {
+            emitError("语音引擎正在初始化，请稍后重试")
             return
         }
 
@@ -285,14 +307,15 @@ class PoemViewModel(
 
         val lines = listOf(poem.title, poem.dynasty, poem.author) +
                 poem.content.split("\n").filter { it.isNotBlank() }
-
-        println("PoemViewModel split into ${lines.size} lines")
         lastUtteranceId = (lines.size - 1).toString()
 
         lines.forEachIndexed { index, line ->
-            val enqueue = index > 0
-            ttsService.speak(line, index.toString(), enqueue)
+            service.speak(line, index.toString(), enqueue = index > 0)
         }
+    }
+
+    private fun emitError(message: String) {
+        viewModelScope.launch { _effect.emit(PoemEffect.ShowError(message)) }
     }
 
     private fun updateHighlight(index: Int) {
@@ -305,22 +328,16 @@ class PoemViewModel(
     }
 
     private fun checkAutoPlayNext(utteranceId: String) {
-        if (utteranceId == lastUtteranceId && viewState.value.isAutoPlay) {
-            val currentPoem = viewState.value.selectedPoem ?: return
-            val poems = viewState.value.filteredPoems
-            val currentIndex = poems.indexOfFirst { it.id == currentPoem.id }
+        if (utteranceId != lastUtteranceId || !viewState.value.isAutoPlay) return
 
-            if (currentIndex != -1 && poems.isNotEmpty()) {
-                val nextIndex = (currentIndex + 1) % poems.size
-                val nextPoem = poems[nextIndex]
-                handleIntent(PoemIntent.SelectPoem(nextPoem))
-                handleIntent(PoemIntent.Speak(nextPoem))
-            }
-        }
-    }
+        val currentPoem = viewState.value.selectedPoem ?: return
+        val poems = viewState.value.filteredPoems
+        if (poems.isEmpty()) return
 
-    override fun onCleared() {
-        super.onCleared()
-        ttsService?.dispose()
+        val currentIndex = poems.indexOfFirst { it.id == currentPoem.id }
+        val nextIndex = (currentIndex + 1).mod(poems.size)
+        val nextPoem = poems[nextIndex]
+        handleIntent(PoemIntent.SelectPoem(nextPoem))
+        handleIntent(PoemIntent.Speak(nextPoem))
     }
 }

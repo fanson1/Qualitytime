@@ -17,9 +17,9 @@ object PoemFilterEngine {
     ): List<Poem> {
         val strippedQuery = if (searchQuery.isNotBlank()) stripToneMarks(searchQuery) else ""
         return poems.filter { poem ->
-            val matchesGrade = selectedGrade == "全部" || poem.grade == selectedGrade
-            val matchesDynasty = selectedDynasty == "全部" || poem.dynasty == selectedDynasty
-            val matchesAuthor = selectedAuthor == "全部" || poem.author == selectedAuthor
+            val matchesGrade = selectedGrade == FILTER_ALL || poem.grade == selectedGrade
+            val matchesDynasty = selectedDynasty == FILTER_ALL || poem.dynasty == selectedDynasty
+            val matchesAuthor = selectedAuthor == FILTER_ALL || poem.author == selectedAuthor
             val matchesQuery = searchQuery.isBlank() ||
                     poem.title.contains(searchQuery, ignoreCase = true) ||
                     poem.author.contains(searchQuery, ignoreCase = true) ||
@@ -86,37 +86,37 @@ object PoemFilterEngine {
         searchQuery: String
     ): Int {
         var count = 0
-        if (selectedGrade != "全部") count++
-        if (selectedDynasty != "全部") count++
-        if (selectedAuthor != "全部") count++
+        if (selectedGrade != FILTER_ALL) count++
+        if (selectedDynasty != FILTER_ALL) count++
+        if (selectedAuthor != FILTER_ALL) count++
         if (searchQuery.isNotBlank()) count++
         return count
     }
 
     fun extractCategories(poems: List<Poem>): CategoryResult {
         val allGrades = poems.map { it.grade }.distinct().filter { it.isNotEmpty() }
-        val sortedGrades = listOf("全部") +
+        val sortedGrades = listOf(FILTER_ALL) +
                 GRADE_ORDER.filter { it in allGrades } +
                 allGrades.filter { it !in GRADE_ORDER }
 
         val grades = sortedGrades.map { grade ->
-            CategoryOption(grade, if (grade == "全部") poems.size else poems.count { it.grade == grade })
+            CategoryOption(grade, if (grade == FILTER_ALL) poems.size else poems.count { it.grade == grade })
         }
 
         val allDynasties = poems.map { it.dynasty }.distinct()
         val sortedDynasties = DYNASTY_ORDER.filter { it in allDynasties } +
                 allDynasties.filter { it !in DYNASTY_ORDER }
-        val dynasties = (listOf("全部") + sortedDynasties).map { dynasty ->
+        val dynasties = (listOf(FILTER_ALL) + sortedDynasties).map { dynasty ->
             CategoryOption(
                 dynasty,
-                if (dynasty == "全部") poems.size else poems.count { it.dynasty == dynasty }
+                if (dynasty == FILTER_ALL) poems.size else poems.count { it.dynasty == dynasty }
             )
         }
 
-        val authors = (listOf("全部") + poems.map { it.author }.distinct().sorted()).map { author ->
+        val authors = (listOf(FILTER_ALL) + poems.map { it.author }.distinct().sorted()).map { author ->
             CategoryOption(
                 author,
-                if (author == "全部") poems.size else poems.count { it.author == author }
+                if (author == FILTER_ALL) poems.size else poems.count { it.author == author }
             )
         }
 
@@ -142,10 +142,15 @@ object PoemFilterEngine {
         return map
     }
 
+    /**
+     * Canonical order of grades used for filtering chips and grade sorting.
+     * Must match the labels used in `poems.json` ("幼儿园", "一年级" ... "十三年级")
+     * with "课外" (outside-curriculum) always last.
+     */
     private val GRADE_ORDER = listOf(
-        "0年级", "一年级", "二年级", "三年级", "四年级",
+        "幼儿园", "一年级", "二年级", "三年级", "四年级",
         "五年级", "六年级", "七年级", "八年级", "九年级",
-        "10年级", "11年级", "12年级", "十三年级"
+        "十年级", "十一年级", "十二年级", "十三年级", "课外"
     )
 
     private val DYNASTY_ORDER = listOf(

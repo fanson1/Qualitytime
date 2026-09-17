@@ -106,12 +106,12 @@ fun FilterSection(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val allGrade = state.grades.firstOrNull { it.name == "全部" }
+            val allGrade = state.grades.firstOrNull { it.name == FILTER_ALL }
             if (allGrade != null) {
                 Spacer(modifier = Modifier.width(16.dp))
                 FilterChip(
-                    selected = state.selectedGrade == "全部",
-                    onClick = { onIntent(PoemIntent.FilterByGrade("全部")) },
+                    selected = state.selectedGrade == FILTER_ALL,
+                    onClick = { onIntent(PoemIntent.FilterByGrade(FILTER_ALL)) },
                     label = { Text("全部 (${allGrade.count})", fontSize = 11.sp) },
                     shape = CircleShape,
                     colors = FilterChipDefaults.filterChipColors(

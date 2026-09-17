@@ -14,7 +14,10 @@ fun main() {
 fun Application.module() {
     routing {
         get("/") {
-            call.respondText(sayHello("Ktor"))
+            call.respondText("QualityTime server is running")
+        }
+        get("/health") {
+            call.respondText("ok")
         }
     }
 }

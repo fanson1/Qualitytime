@@ -1,13 +1,23 @@
 package com.finley.android.qualitytime.service
 
+import com.finley.android.qualitytime.util.AppLog
+
+/**
+ * Stub implementation for JVM targets (used by the Ktor server and local runs).
+ * There is no way to synthesize speech on a plain JVM, so utterances are
+ * acknowledged immediately rather than played.
+ */
 class JvmTextToSpeechService : TextToSpeechService {
+    companion object {
+        private const val TAG = "JVM-TTS"
+    }
+
     private var onStartListener: ((String) -> Unit)? = null
     private var onDoneListener: ((String) -> Unit)? = null
 
     override fun speak(text: String, utteranceId: String, enqueue: Boolean) {
-        println("JVM TTS: $text (ID: $utteranceId, Enqueue: $enqueue)")
+        AppLog.i(TAG) { "speak(id=$utteranceId, enqueue=$enqueue): $text" }
         onStartListener?.invoke(utteranceId)
-        // Simulate done after 1 second
         onDoneListener?.invoke(utteranceId)
     }
 
@@ -23,7 +33,7 @@ class JvmTextToSpeechService : TextToSpeechService {
     override fun isReady(): Boolean = true
 
     override fun setSpeechRate(rate: Float) {
-        println("JVM TTS rate set to: $rate")
+        AppLog.i(TAG) { "speech rate set to $rate" }
     }
 
     override fun getVoices(): List<TtsVoice> {
@@ -31,7 +41,7 @@ class JvmTextToSpeechService : TextToSpeechService {
     }
 
     override fun setVoice(id: String) {
-        println("JVM TTS voice set to: $id")
+        AppLog.i(TAG) { "voice set to $id" }
     }
 }
 

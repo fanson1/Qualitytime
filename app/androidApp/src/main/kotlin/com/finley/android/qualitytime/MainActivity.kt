@@ -7,10 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 
-import com.finley.android.qualitytime.service.DataStoreSettingsService
-import com.finley.android.qualitytime.service.createDataStore
-import com.finley.android.qualitytime.service.createTextToSpeechService
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -19,11 +15,9 @@ class MainActivity : ComponentActivity() {
         // bar so the app's edge-to-edge background shows through it.
         window.isNavigationBarContrastEnforced = false
 
-        val ttsService = createTextToSpeechService(applicationContext)
-        val settingsService = DataStoreSettingsService(createDataStore(applicationContext))
-
+        val app = application as QualityTimeApp
         setContent {
-            App(ttsService, settingsService)
+            App(app.ttsService, app.settingsService)
         }
     }
 }

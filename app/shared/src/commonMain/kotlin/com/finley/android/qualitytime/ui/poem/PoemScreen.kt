@@ -226,10 +226,13 @@ fun PoemScreen(viewModel: PoemViewModel) {
                     }
 
                     ScreenKind.HOME -> {
-                        if (state.isLoading) {
-                            PoemListSkeleton()
-                        } else {
-                            HomeContent(
+                        when {
+                            state.isLoading -> PoemListSkeleton()
+                            state.loadError != null -> LoadErrorState(
+                                message = state.loadError,
+                                onRetry = { viewModel.handleIntent(PoemIntent.RetryLoad) }
+                            )
+                            else -> HomeContent(
                                 state = state,
                                 onIntent = { viewModel.handleIntent(it) }
                             )
