@@ -115,3 +115,8 @@ Desktop.ini
 *.jks
 *.key
 *.pem
+# IDE
+.idea/
+.kotlin/
+*.iml
+app/iosApp/iosApp.xcodeproj/xcuserdata/
